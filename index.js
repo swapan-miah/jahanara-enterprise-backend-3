@@ -51,6 +51,7 @@ async function run() {
     const orderCollection = database.collection("orders");
     const storeCollection = database.collection("store");
     const purchase_history_Collection = database.collection("purchase-history");
+    const sells_history_Collection = database.collection("sells-history");
 
     // find all products
     app.get("/products", async (req, res) => {
@@ -285,6 +286,68 @@ async function run() {
         });
       }
     });
+
+    // find all products Name
+    app.get("/find-store-products-name", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const query = {};
+          const result = await storeCollection.find(query).toArray();
+          const productsName = result.map((product) => product?.product_name);
+          res.send(productsName);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find store product info by product name for sells
+    app.get("/store-product-info-by-product-name", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const product_name = req.query?.product_name;
+          if (!product_name) {
+            return res
+              .status(400)
+              .send({ message: "Product name is required" });
+          }
+
+          const query = { product_name };
+          const result = await storeCollection.findOne(query);
+
+          if (result) {
+            res.send(result);
+          } else {
+            res.status(404).send({ message: "Product not found" });
+          }
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
     // ------------------    add product    ---------------------
     app.post("/add-product", async (req, res) => {
       try {
@@ -396,7 +459,6 @@ async function run() {
             (item) => item.product_name
           );
           const isHaveItem = already_store_Products.includes(itmeName);
-          console.log(isHaveItem);
 
           if (isHaveItem) {
             const queryItem = { product_name: itmeName };
@@ -435,6 +497,48 @@ async function run() {
       } catch (error) {
         console.error("Error handling pre order add:", error);
         res.status(500).send("Server Error");
+      }
+    });
+
+    //--------------------- sell info add ------------------------------
+    app.post("/sell", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          // Extract the storeItem from the request body
+          const storeItem = req.body;
+
+          // Remove crose_maching_key from storeItem
+          const { crose_maching_key, products, ...storeData } = storeItem;
+
+          // Filter out products with quantity 0
+          const filteredProducts = products.filter(
+            (product) => product.quantity > 0
+          );
+
+          // Create a new object with filtered products
+          const finalStoreItem = {
+            ...storeData,
+            products: filteredProducts,
+          };
+
+          // Insert the modified object into the database
+          const storeInfo = await sells_history_Collection.insertOne(
+            finalStoreItem
+          );
+
+          const storeAllData = storeCollection.find().toArray();
+
+          console.log(finalStoreItem);
+          res.send(storeInfo);
+        } else {
+          res.status(401).send({ message: "Unauthorized: Invalid key" });
+        }
+      } catch (error) {
+        console.error("Error handling store item addition:", error);
+        res.status(500).json({ message: "Server Error" });
       }
     });
 
