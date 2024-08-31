@@ -161,6 +161,7 @@ async function run() {
         });
       }
     });
+
     // find all pre orders
     app.get("/pre-orders", async (req, res) => {
       try {
@@ -262,7 +263,8 @@ async function run() {
       }
     });
 
-    //  get single pre order item
+    //  get single pre order item but order item is same collection
+    // so get single order item
     app.get("/find-this-pre-order/:id", async (req, res) => {
       try {
         const crose_maching_backend_key = process.env.Front_Backend_Key;
@@ -287,7 +289,7 @@ async function run() {
       }
     });
 
-    // find all products Name
+    // find all store  products Name
     app.get("/find-store-products-name", async (req, res) => {
       try {
         const crose_maching_backend_key = process.env.Front_Backend_Key;
@@ -348,6 +350,59 @@ async function run() {
       }
     });
 
+    // find Store collection
+    app.get("/sells-history", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const query = {};
+          const result = (
+            await sells_history_Collection.find(query).toArray()
+          ).reverse();
+          console.log(result);
+
+          res.send(result);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    //  get single stor item
+    app.get("/get-single-store-item/:id", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await storeCollection.findOne(query);
+          res.send(result);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
     // ------------------    add product    ---------------------
     app.post("/add-product", async (req, res) => {
       try {
@@ -368,7 +423,7 @@ async function run() {
         res.status(500).send("Server Error");
       }
     });
-    // ------------------ Add Product ---------------------
+    // ------------------ Add pre order Product ---------------------
     app.post("/pre-order", async (req, res) => {
       try {
         const crose_maching_backend_key = process.env.Front_Backend_Key;
@@ -518,6 +573,14 @@ async function run() {
             (product) => product.quantity > 0
           );
 
+          // Check if all products have a quantity of 0
+          if (filteredProducts.length === 0) {
+            res.status(400).send({
+              message: "You did not sell any items. All quantities are zero.",
+            });
+            return;
+          }
+
           // Create a new object with filtered products
           const finalStoreItem = {
             ...storeData,
@@ -529,7 +592,41 @@ async function run() {
             finalStoreItem
           );
 
-          const storeAllData = storeCollection.find().toArray();
+          // Fetch all data from storeCollection
+          const storeAllData = await storeCollection.find().toArray();
+
+          // Update store quantities based on finalStoreItem
+          for (const soldProduct of finalStoreItem.products) {
+            const matchingStoreProduct = storeAllData.find(
+              (storeProduct) =>
+                storeProduct.product_name === soldProduct.productName &&
+                storeProduct.size === soldProduct.size
+            );
+
+            if (matchingStoreProduct) {
+              const newQuantity =
+                matchingStoreProduct.quantity - parseInt(soldProduct.quantity);
+
+              // Ensure newQuantity is not negative
+              if (newQuantity < 0) {
+                res.status(400).send({
+                  message: `Insufficient stock for ${soldProduct.productName}. Available: ${matchingStoreProduct.quantity}, Requested: ${soldProduct.quantity}`,
+                });
+                return;
+              }
+
+              // Update the store product's quantity in the database
+              await storeCollection.updateOne(
+                { _id: matchingStoreProduct._id },
+                { $set: { quantity: newQuantity } }
+              );
+            } else {
+              res.status(404).send({
+                message: `Product ${soldProduct.productName} not found in store`,
+              });
+              return;
+            }
+          }
 
           console.log(finalStoreItem);
           res.send(storeInfo);
@@ -594,6 +691,41 @@ async function run() {
           };
           // Update the document in the collection
           const updateResult = await orderCollection.updateOne(
+            filter,
+            updateDoc,
+            options
+          );
+          res.send(updateResult);
+        } else {
+          res.status(403).send("Unauthorized access");
+        }
+      } catch (error) {
+        console.error("Error handling product info update:", error);
+        res.status(500).send("Server Error");
+      }
+    });
+
+    // update pre order
+    app.put("/update-store-item/:id", async (req, res) => {
+      try {
+        const cross_matching_backend_key = `${process.env.Front_Backend_Key}`;
+        const cross_matching_frontend_key = req.body.crose_maching_key;
+        if (cross_matching_backend_key === cross_matching_frontend_key) {
+          const paramsId = req.params.id;
+          const filter = { _id: new ObjectId(paramsId) };
+          const options = { upsert: true };
+          const updateDoc = {
+            $set: {
+              product_name: req.body?.product_name,
+              company_name: req.body?.company_name,
+              size: req.body?.size,
+              quantity: req.body?.quantity,
+              price: req.body?.price,
+              location: req.body?.location,
+            },
+          };
+          // Update the document in the collection
+          const updateResult = await storeCollection.updateOne(
             filter,
             updateDoc,
             options
