@@ -298,8 +298,13 @@ async function run() {
 
         if (crose_maching_backend_key === crose_maching_frontend_key) {
           const query = {};
-          const result = await storeCollection.find(query).toArray();
-          const productsName = result.map((product) => product?.product_name);
+          const data = await storeCollection.find(query).toArray();
+          const filterProducts = data.filter(
+            (product) => product?.quantity !== 0
+          );
+          const productsName = filterProducts.map(
+            (product) => product?.product_name
+          );
           res.send(productsName);
         } else {
           res.status(403).send({
