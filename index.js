@@ -418,7 +418,7 @@ async function run() {
             product_name: req.body?.product_name,
             company_name: req.body?.company_name,
             size: req.body?.size,
-            price: req.body?.price,
+            purchase_price: req.body?.purchase_price,
           };
           const productInfo = await productCollection.insertOne(product);
           res.send(productInfo);
@@ -440,7 +440,7 @@ async function run() {
             company_name: req.body.company_name,
             size: req.body.size,
             quantity: req.body.quantity,
-            price: req.body.price,
+            purchase_price: req.body.purchase_price,
             size: req.body.size,
           };
 
@@ -546,7 +546,7 @@ async function run() {
               company_name: req.body?.company_name,
               size: req.body?.size,
               quantity: req.body?.quantity,
-              price: req.body?.price,
+              purchase_price: req.body?.purchase_price,
             };
 
             const storeInfo = await storeCollection.insertOne(storeItem);
@@ -691,7 +691,7 @@ async function run() {
               company_name: req.body?.company_name,
               size: req.body?.size,
               quantity: req.body?.quantity,
-              price: req.body?.price,
+              purchase_price: req.body?.purchase_price,
             },
           };
           // Update the document in the collection
@@ -725,7 +725,7 @@ async function run() {
               company_name: req.body?.company_name,
               size: req.body?.size,
               quantity: req.body?.quantity,
-              price: req.body?.price,
+              purchase_price: req.body?.price,
               sell_price: req.body?.sell_price,
               location: req.body?.location,
             },
@@ -809,6 +809,18 @@ async function run() {
         console.error("Error handling delete product:", error);
         res.status(500).send("Server Error");
       }
+    });
+
+    // ........................
+    app.get("/update-price-field", async (req, res) => {
+      const updateResult = await purchase_history_Collection.updateMany(
+        {}, // Empty filter matches all documents
+        {
+          $rename: { price: "purchase_price" },
+        }
+      );
+
+      res.send("yes");
     });
   } finally {
   }
