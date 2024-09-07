@@ -726,6 +726,7 @@ async function run() {
               size: req.body?.size,
               quantity: req.body?.quantity,
               price: req.body?.price,
+              sell_price: req.body?.sell_price,
               location: req.body?.location,
             },
           };
