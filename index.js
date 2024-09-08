@@ -523,13 +523,14 @@ async function run() {
           if (isHaveItem) {
             const queryItem = { product_name: itmeName };
             const findItem = await storeCollection.findOne(queryItem);
-            const total_quantity = findItem?.quantity + req.body?.quantity;
+            const total_quantity =
+              findItem?.store_quantity + req.body?.quantity;
 
             const filter = { product_name: itmeName };
             const options = { upsert: true };
             const updateDoc = {
               $set: {
-                quantity: total_quantity,
+                store_quantity: total_quantity,
               },
             };
             // Update the document in the collection
@@ -545,7 +546,7 @@ async function run() {
               product_name: req.body?.product_name,
               company_name: req.body?.company_name,
               size: req.body?.size,
-              quantity: req.body?.quantity,
+              store_quantity: req.body?.quantity,
               purchase_price: req.body?.purchase_price,
             };
 
@@ -575,7 +576,7 @@ async function run() {
 
           // Filter out products with quantity 0
           const filteredProducts = products.filter(
-            (product) => product.quantity > 0
+            (product) => product.sell_quantity > 0
           );
 
           // Check if all products have a quantity of 0
@@ -587,21 +588,23 @@ async function run() {
           }
 
           // Create a new object with filtered products
-          const finalStoreItem = {
+          const final_Sells_Item = {
             ...storeData,
             products: filteredProducts,
           };
 
+          console.log(final_Sells_Item);
+
           // Insert the modified object into the database
           const storeInfo = await sells_history_Collection.insertOne(
-            finalStoreItem
+            final_Sells_Item
           );
 
           // Fetch all data from storeCollection
           const storeAllData = await storeCollection.find().toArray();
 
-          // Update store quantities based on finalStoreItem
-          for (const soldProduct of finalStoreItem.products) {
+          // Update store quantities based on final_Sells_Item
+          for (const soldProduct of final_Sells_Item.products) {
             const matchingStoreProduct = storeAllData.find(
               (storeProduct) =>
                 storeProduct.product_name === soldProduct.productName &&
@@ -610,7 +613,8 @@ async function run() {
 
             if (matchingStoreProduct) {
               const newQuantity =
-                matchingStoreProduct.quantity - parseInt(soldProduct.quantity);
+                matchingStoreProduct.store_quantity -
+                parseInt(soldProduct.sell_quantity);
 
               // Ensure newQuantity is not negative
               if (newQuantity < 0) {
@@ -623,7 +627,7 @@ async function run() {
               // Update the store product's quantity in the database
               await storeCollection.updateOne(
                 { _id: matchingStoreProduct._id },
-                { $set: { quantity: newQuantity } }
+                { $set: { store_quantity: newQuantity } }
               );
             } else {
               res.status(404).send({
@@ -633,7 +637,7 @@ async function run() {
             }
           }
 
-          console.log(finalStoreItem);
+          console.log(final_Sells_Item);
           res.send(storeInfo);
         } else {
           res.status(401).send({ message: "Unauthorized: Invalid key" });
@@ -647,6 +651,7 @@ async function run() {
     // update product info
     app.put("/product_info_update/:id", async (req, res) => {
       try {
+        console.log(req.body);
         const cross_matching_backend_key = `${process.env.Front_Backend_Key}`;
         const cross_matching_frontend_key = req.body.crose_maching_key;
         if (cross_matching_backend_key === cross_matching_frontend_key) {
@@ -658,6 +663,7 @@ async function run() {
               product_name: req.body?.product_name,
               company_name: req.body?.company_name,
               size: req.body?.size,
+              purchase_price: req.body?.purchase_price,
             },
           };
           // Update the document in the collection
@@ -724,8 +730,8 @@ async function run() {
               product_name: req.body?.product_name,
               company_name: req.body?.company_name,
               size: req.body?.size,
-              quantity: req.body?.quantity,
-              purchase_price: req.body?.price,
+              store_quantity: req.body?.store_quantity,
+              purchase_price: req.body?.purchase_price,
               sell_price: req.body?.sell_price,
               location: req.body?.location,
             },
@@ -813,10 +819,10 @@ async function run() {
 
     // ........................
     app.get("/update-price-field", async (req, res) => {
-      const updateResult = await purchase_history_Collection.updateMany(
+      const updateResult = await storeCollection.updateMany(
         {}, // Empty filter matches all documents
         {
-          $rename: { price: "purchase_price" },
+          $rename: { quantity: "store_quantity" },
         }
       );
 
