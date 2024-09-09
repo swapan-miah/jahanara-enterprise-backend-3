@@ -367,7 +367,6 @@ async function run() {
           const result = (
             await sells_history_Collection.find(query).toArray()
           ).reverse();
-          console.log(result);
 
           res.send(result);
         } else {
@@ -518,94 +517,88 @@ async function run() {
 
     // ------------------ product  store     add hide this order    ---------------------
     app.post("/store", async (req, res) => {
+      console.log(req.body);
+
       try {
         const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
         const crose_maching_frontend_key = req.body.crose_maching_key;
 
-        if (crose_maching_backend_key == crose_maching_frontend_key) {
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
           // pick product name and id
           const id = req.body?.id;
           const itemName = req.body?.product_name;
 
-          console.log("id", id);
+          // Check if the product is already in the store
+          const queryItem = { product_name: itemName };
+          console.log(queryItem);
 
-          // query for insert and delete
-          const orderItemQuery = { _id: new ObjectId(req.body.id) };
+          const findItem = await storeCollection.findOne(queryItem);
 
-          // ---------1. Add this record to purchase history collection
+          const orderItemQuery = { _id: new ObjectId(id) };
+
           const orderRecord = await orderCollection.findOne(orderItemQuery, {
-            projection: { _id: 0, is_order: 0 }, // Ignore unnecessary fields
+            projection: { _id: 0, is_order: 0 },
           });
 
-          console.log(orderRecord);
+          if (!orderRecord) {
+            return res.status(404).send("Order item not found.");
+          }
 
-          if (orderRecord) {
-            const currentDate = new Date();
-            const dateOnly = currentDate.toISOString().split("T")[0];
-            orderRecord.storeDate = dateOnly;
+          const currentDate = new Date();
+          const dateOnly = currentDate.toISOString().split("T")[0];
+          orderRecord.storeDate = dateOnly;
 
-            // Insert into purchase history
-            const purchaseHistoryItem =
-              await purchase_history_Collection.insertOne(orderRecord);
-            if (!purchaseHistoryItem.acknowledged) {
-              return res
-                .status(500)
-                .send("Failed to insert into purchase history.");
-            }
+          // Insert into purchase history
+          const purchaseHistoryItem =
+            await purchase_history_Collection.insertOne(orderRecord);
+          if (!purchaseHistoryItem.acknowledged) {
+            return res
+              .status(500)
+              .send("Failed to insert into purchase history.");
+          }
 
-            // ---------2. Delete the record from order collection
-            const deleteOrder = await orderCollection.deleteOne(orderItemQuery);
-            if (deleteOrder.deletedCount === 0) {
-              return res.status(404).send("Order not found.");
-            } else {
-              return res.send(deleteOrder);
-            }
+          // Delete the order from orderCollection
+          const deleteOrder = await orderCollection.deleteOne(orderItemQuery);
+          if (deleteOrder.deletedCount === 0) {
+            return res.status(404).send("Order not found.");
+          }
 
-            // Now proceed with storing the item in store collection
+          // Update or create new store item
+          if (findItem) {
+            // Update existing store item
+            const total_quantity =
+              findItem?.store_quantity + req.body?.quantity;
+            const updateDoc = {
+              $set: {
+                store_quantity: total_quantity,
+              },
+            };
 
-            // Check if the product is already in the store
-            const queryItem = { product_name: itemName };
-            const findItem = await storeCollection.findOne(queryItem);
-
-            if (findItem) {
-              // If product exists, update its quantity
-              const total_quantity =
-                findItem.store_quantity + req.body.quantity;
-
-              const updateDoc = {
-                $set: {
-                  store_quantity: total_quantity,
-                },
-              };
-              const updateResult = await storeCollection.updateOne(
-                queryItem,
-                updateDoc
-              );
-              res.send(updateResult);
-            } else {
-              // Create new store item
-              const storeItem = {
-                product_name: req.body.product_name,
-                company_name: req.body.company_name,
-                size: req.body.size,
-                store_quantity: req.body.quantity,
-                purchase_price: req.body.purchase_price,
-                sell_price: req.body.sell_price,
-              };
-              const storeInfo = await storeCollection.insertOne(storeItem);
-              console.log(storeInfo);
-
-              //   res.send(storeInfo);
-            }
+            const updateResult = await storeCollection.updateOne(
+              queryItem,
+              updateDoc
+            );
+            return res.send(updateResult); // Return after sending response
           } else {
-            res.status(404).send("Order item not found.");
+            // Create new store item
+            const storeItem = {
+              product_name: req.body.product_name,
+              company_name: req.body.company_name,
+              size: req.body.size,
+              store_quantity: req.body.quantity,
+              purchase_price: req.body.purchase_price,
+              sell_price: req.body.sell_price,
+            };
+
+            const storeInfo = await storeCollection.insertOne(storeItem);
+            return res.send(storeInfo); // Return after sending response
           }
         } else {
-          res.status(403).send("Unauthorized request.");
+          return res.status(403).send("Unauthorized request."); // Return after unauthorized
         }
       } catch (error) {
         console.error("Error handling store operation:", error);
-        res.status(500).send("Server Error");
+        return res.status(500).send("Server Error"); // Return after catching error
       }
     });
 
@@ -640,8 +633,6 @@ async function run() {
             ...storeData,
             products: filteredProducts,
           };
-
-          console.log(final_Sells_Item);
 
           // Insert the modified object into the database
           const storeInfo = await sells_history_Collection.insertOne(
@@ -685,7 +676,6 @@ async function run() {
             }
           }
 
-          console.log(final_Sells_Item);
           res.send(storeInfo);
         } else {
           res.status(401).send({ message: "Unauthorized: Invalid key" });
@@ -699,7 +689,6 @@ async function run() {
     // update product info
     app.put("/product_info_update/:id", async (req, res) => {
       try {
-        console.log(req.body);
         const cross_matching_backend_key = `${process.env.Front_Backend_Key}`;
         const cross_matching_frontend_key = req.body.crose_maching_key;
         if (cross_matching_backend_key === cross_matching_frontend_key) {
