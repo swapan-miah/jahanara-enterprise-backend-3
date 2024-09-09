@@ -1,83 +1,84 @@
-app.post("/sell", async (req, res) => {
+// ------------------ product  store     add hide this order    ---------------------
+app.post("/store", async (req, res) => {
   try {
     const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
     const crose_maching_frontend_key = req.body.crose_maching_key;
 
-    if (crose_maching_backend_key === crose_maching_frontend_key) {
-      // Extract the storeItem from the request body
-      const storeItem = req.body;
+    if (crose_maching_backend_key == crose_maching_frontend_key) {
+      // pick product name and id
+      const id = req.body?.id;
+      const itemName = req.body?.product_name;
 
-      // Remove crose_maching_key from storeItem
-      const { crose_maching_key, products, ...storeData } = storeItem;
+      // query for insert and delete
+      const orderItemQuery = { _id: new ObjectId(req.body.id) };
 
-      // Filter out products with quantity 0
-      const filteredProducts = products.filter(
-        (product) => product.quantity > 0
-      );
+      // ---------1. Add this record to purchase history collection
+      const orderRecord = await orderCollection.findOne(orderItemQuery, {
+        projection: { _id: 0, is_order: 0 }, // Ignore unnecessary fields
+      });
 
-      // Check if all products have a quantity of 0
-      if (filteredProducts.length === 0) {
-        res.status(400).send({
-          message: "You did not sell any items. All quantities are zero.",
-        });
-        return;
-      }
+      if (orderRecord) {
+        const currentDate = new Date();
+        const dateOnly = currentDate.toISOString().split("T")[0];
+        orderRecord.storeDate = dateOnly;
 
-      // Create a new object with filtered products
-      const final_Sells_Item = {
-        ...storeData,
-        products: filteredProducts,
-      };
-
-      // Insert the modified object into the database
-      const storeInfo = await sells_history_Collection.insertOne(
-        final_Sells_Item
-      );
-
-      // Fetch all data from storeCollection
-      const storeAllData = await storeCollection.find().toArray();
-
-      // Update store quantities based on final_Sells_Item
-      for (const soldProduct of final_Sells_Item.products) {
-        const matchingStoreProduct = storeAllData.find(
-          (storeProduct) =>
-            storeProduct.product_name === soldProduct.productName &&
-            storeProduct.size === soldProduct.size
+        // Insert into purchase history
+        const purchaseHistoryItem = await purchase_history_Collection.insertOne(
+          orderRecord
         );
-
-        if (matchingStoreProduct) {
-          const newQuantity =
-            matchingStoreProduct.store_quantity -
-            parseInt(soldProduct.sell_quantity);
-
-          // Ensure newQuantity is not negative
-          if (newQuantity < 0) {
-            res.status(400).send({
-              message: `Insufficient stock for ${soldProduct.productName}. Available: ${matchingStoreProduct.quantity}, Requested: ${soldProduct.quantity}`,
-            });
-            return;
-          }
-
-          // Update the store product's quantity in the database
-          await storeCollection.updateOne(
-            { _id: matchingStoreProduct._id },
-            { $set: { store_quantity: newQuantity } }
-          );
-        } else {
-          res.status(404).send({
-            message: `Product ${soldProduct.productName} not found in store`,
-          });
-          return;
+        if (!purchaseHistoryItem.acknowledged) {
+          return res
+            .status(500)
+            .send("Failed to insert into purchase history.");
         }
-      }
 
-      console.log(final_Sells_Item);
-      res.send(storeInfo);
+        // ---------2. Delete the record from order collection
+        const deleteOrder = await orderCollection.deleteOne(orderItemQuery);
+        if (deleteOrder.deletedCount === 0) {
+          return res.status(404).send("Order not found.");
+        }
+
+        // Now proceed with storing the item in store collection
+
+        // Check if the product is already in the store
+        const queryItem = { product_name: itemName };
+        const findItem = await storeCollection.findOne(queryItem);
+
+        if (findItem) {
+          // If product exists, update its quantity
+          const total_quantity = findItem.store_quantity + req.body.quantity;
+
+          const updateDoc = {
+            $set: {
+              store_quantity: total_quantity,
+            },
+          };
+          const updateResult = await storeCollection.updateOne(
+            queryItem,
+            updateDoc
+          );
+          res.send({ message: "Store item updated.", updateResult });
+        } else {
+          // Create new store item
+          const storeItem = {
+            product_name: req.body.product_name,
+            company_name: req.body.company_name,
+            size: req.body.size,
+            store_quantity: req.body.quantity,
+            purchase_price: req.body.purchase_price,
+            sell_price: req.body.sell_price,
+          };
+          const storeInfo = await storeCollection.insertOne(storeItem);
+          res.send({ message: "New store item inserted.", storeInfo });
+        }
+      } else {
+        res.status(404).send("Order item not found.");
+      }
     } else {
-      res.status(401).send({ message: "Unauthorized: Invalid key" });
+      res.status(403).send("Unauthorized request.");
     }
   } catch (error) {
-    console.error("Error handling store item addition:", error);
-    res.status(500).json({ message: "Server Error" });
+    console.error("Error handling store operation:", error);
+    res.status(500).send("Server Error");
   }
 });
