@@ -46,7 +46,7 @@ cloudinary.config({
 
 async function run() {
   try {
-    const database = client.db("my-shop");
+    const database = client.db("my-shop-stander");
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
     const storeCollection = database.collection("store");
@@ -358,16 +358,41 @@ async function run() {
     // find Store collection
     app.get("/sells-history", async (req, res) => {
       try {
+        // const crose_maching_backend_key = process.env.Front_Backend_Key;
+        // const crose_maching_frontend_key =
+        //   req.headers.authorization?.split(" ")[1];
+
+        // if (crose_maching_backend_key === crose_maching_frontend_key) {
+        const query = {};
+        const result = (
+          await sells_history_Collection.find(query).toArray()
+        ).reverse();
+
+        res.send(result);
+        // }
+        // else {
+        //   res.status(403).send({
+        //     message: "Forbidden: Invalid Key",
+        //   });
+        // }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    app.get("/sell-history/:id", async (req, res) => {
+      try {
         const crose_maching_backend_key = process.env.Front_Backend_Key;
         const crose_maching_frontend_key =
           req.headers.authorization?.split(" ")[1];
 
         if (crose_maching_backend_key === crose_maching_frontend_key) {
-          const query = {};
-          const result = (
-            await sells_history_Collection.find(query).toArray()
-          ).reverse();
-
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await sells_history_Collection.findOne(query);
           res.send(result);
         } else {
           res.status(403).send({
@@ -517,8 +542,6 @@ async function run() {
 
     // ------------------ product  store     add hide this order    ---------------------
     app.post("/store", async (req, res) => {
-      console.log(req.body);
-
       try {
         const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
         const crose_maching_frontend_key = req.body.crose_maching_key;
@@ -530,7 +553,6 @@ async function run() {
 
           // Check if the product is already in the store
           const queryItem = { product_name: itemName };
-          console.log(queryItem);
 
           const findItem = await storeCollection.findOne(queryItem);
 
@@ -628,9 +650,13 @@ async function run() {
             return;
           }
 
+          const sells_his_length =
+            (await sells_history_Collection.find({}).toArray()).length || 0;
+
           // Create a new object with filtered products
           const final_Sells_Item = {
             ...storeData,
+            invoice_no: sells_his_length + 1,
             products: filteredProducts,
           };
 
@@ -638,6 +664,14 @@ async function run() {
           const storeInfo = await sells_history_Collection.insertOne(
             final_Sells_Item
           );
+          console.log(storeInfo);
+
+          if (storeInfo) {
+            // Return only the insertedId
+            return res.send({ insertedId: storeInfo.insertedId });
+          }
+
+          // res.send(storeInfo);
 
           // Fetch all data from storeCollection
           const storeAllData = await storeCollection.find().toArray();
