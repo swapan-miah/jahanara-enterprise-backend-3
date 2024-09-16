@@ -675,6 +675,11 @@ async function run() {
           const currentDate = new Date();
           const dateOnly = currentDate.toISOString().split("T")[0];
 
+          const purchaseArray = await purchase_history_Collection
+            .find(query)
+            .toArray();
+          const si = purchaseArray.length + 1; // Correct usage of .length
+
           // Insert into purchase history
           const purchase_info = {
             product_name: req.body.product_name,
@@ -683,6 +688,7 @@ async function run() {
             quantity: req.body.quantity,
             purchase_price: req.body.purchase_price,
             storeDate: dateOnly,
+            si: si,
           };
           const purchaseHistoryItem =
             await purchase_history_Collection.insertOne(purchase_info);
