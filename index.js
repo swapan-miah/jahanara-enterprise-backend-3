@@ -46,12 +46,14 @@ cloudinary.config({
 
 async function run() {
   try {
-    const database = client.db("my-shop-stander");
+    const database = client.db("premium-shop-system");
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
     const storeCollection = database.collection("store");
     const purchase_history_Collection = database.collection("purchase-history");
     const sells_history_Collection = database.collection("sells-history");
+    const due_Collection = database.collection("due");
+    const due_payment_Collection = database.collection("due-payment-history");
 
     // find all products
     app.get("/products", async (req, res) => {
@@ -358,23 +360,22 @@ async function run() {
     // find Store collection
     app.get("/sells-history", async (req, res) => {
       try {
-        // const crose_maching_backend_key = process.env.Front_Backend_Key;
-        // const crose_maching_frontend_key =
-        //   req.headers.authorization?.split(" ")[1];
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
 
-        // if (crose_maching_backend_key === crose_maching_frontend_key) {
-        const query = {};
-        const result = (
-          await sells_history_Collection.find(query).toArray()
-        ).reverse();
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const query = {};
+          const result = (
+            await sells_history_Collection.find(query).toArray()
+          ).reverse();
 
-        res.send(result);
-        // }
-        // else {
-        //   res.status(403).send({
-        //     message: "Forbidden: Invalid Key",
-        //   });
-        // }
+          res.send(result);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
       } catch (error) {
         res.status(500).send({
           message: "An error occurred while fetching data.",
@@ -455,6 +456,111 @@ async function run() {
           } else {
             res.status(404).send({ message: "Product not found" });
           }
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find all due
+    app.get("/due", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const query = {};
+          const result = await due_Collection.find(query).toArray();
+          const reverseResult = result.reverse();
+
+          res.send(reverseResult);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find due recode for invoice payment form
+    app.get("/due/:id", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await due_Collection.findOne(query);
+
+          res.send(result);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // find all due
+    app.get("/due-payment-list", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const query = {};
+          const result = await due_payment_Collection.find(query).toArray();
+          const reverseResult = result.reverse();
+
+          res.send(reverseResult);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // due find by id for due invoice
+    app.get("/due-payment-invoice/:id", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const id = req.params.id;
+          const query = { _id: new ObjectId(id) };
+          const result = await due_payment_Collection.findOne(query);
+          console.log(result);
+
+          res.send(result);
         } else {
           res.status(403).send({
             message: "Forbidden: Invalid Key",
@@ -644,19 +750,24 @@ async function run() {
 
           // Check if all products have a quantity of 0
           if (filteredProducts.length === 0) {
-            res.status(400).send({
-              message: "You did not sell any items. All quantities are zero.",
-            });
+            // res.status(400).send({
+            //   message: "You did not sell any items. All quantities are zero.",
+            // });
             return;
           }
 
           const sells_his_length =
             (await sells_history_Collection.find({}).toArray()).length || 0;
 
+          const due_payment_his_length =
+            (await due_payment_Collection.find({}).toArray()).length || 0;
+          // create new invoice
+          const new_invoice = sells_his_length + due_payment_his_length + 1;
+
           // Create a new object with filtered products
           const final_Sells_Item = {
             ...storeData,
-            invoice_no: sells_his_length + 1,
+            invoice_no: new_invoice,
             products: filteredProducts,
           };
 
@@ -664,12 +775,7 @@ async function run() {
           const storeInfo = await sells_history_Collection.insertOne(
             final_Sells_Item
           );
-          console.log(storeInfo);
-
-          if (storeInfo) {
-            // Return only the insertedId
-            return res.send({ insertedId: storeInfo.insertedId });
-          }
+          // console.log(storeInfo);
 
           // res.send(storeInfo);
 
@@ -691,9 +797,9 @@ async function run() {
 
               // Ensure newQuantity is not negative
               if (newQuantity < 0) {
-                res.status(400).send({
-                  message: `Insufficient stock for ${soldProduct.productName}. Available: ${matchingStoreProduct.quantity}, Requested: ${soldProduct.quantity}`,
-                });
+                // res.status(400).send({
+                //   message: `Insufficient stock for ${soldProduct.productName}. Available: ${matchingStoreProduct.quantity}, Requested: ${soldProduct.quantity}`,
+                // });
                 return;
               }
 
@@ -703,16 +809,98 @@ async function run() {
                 { $set: { store_quantity: newQuantity } }
               );
             } else {
-              res.status(404).send({
-                message: `Product ${soldProduct.productName} not found in store`,
-              });
+              // res.status(404).send({
+              //   message: `Product ${soldProduct.productName} not found in store`,
+              // });
               return;
             }
           }
 
-          res.send(storeInfo);
+          if (req.body?.due) {
+            const dueInfo = {
+              invoice_no: new_invoice,
+              customer_name: req.body?.customer?.name,
+              customer_address: req.body?.customer?.address,
+              customer_mobile: req.body?.customer?.mobile,
+              due: req.body?.due,
+              date: req.body?.date,
+            };
+            const dueInsertResult = await due_Collection.insertOne(dueInfo);
+          }
+
+          if (storeInfo) {
+            // Return only the insertedId
+            return res.send({ insertedId: storeInfo.insertedId });
+          }
         } else {
           res.status(401).send({ message: "Unauthorized: Invalid key" });
+        }
+      } catch (error) {
+        console.error("Error handling store item addition:", error);
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // insert due payment and update due
+    app.post("/due-payment", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const invoice_no = req.body?.invoice_no;
+          const query = { invoice_no: invoice_no };
+
+          const due_old_record = await due_Collection.findOne(query);
+
+          const sells_his_length =
+            (await sells_history_Collection.find({}).toArray()).length || 0;
+
+          const due_payment_his_length =
+            (await due_payment_Collection.find({}).toArray()).length || 0;
+          // create new invoice
+          const new_invoice = sells_his_length + due_payment_his_length + 1;
+
+          const modify_query = { _id: new ObjectId(due_old_record?._id) };
+
+          if (req.body.due > 0) {
+            const options = { upsert: true };
+            const updateDoc = {
+              $set: {
+                invoice_no: new_invoice,
+                customer_name: req.body?.customer_name,
+                customer_address: req.body?.customer_address,
+                customer_mobile: req.body?.customer_mobile,
+                due: req.body?.due,
+                date: new Date(),
+              },
+            };
+
+            // Update the document in the collection
+            const updateResult = await due_Collection.updateOne(
+              modify_query,
+              updateDoc,
+              options
+            );
+          } else {
+            const result = await due_Collection.deleteOne(modify_query);
+          }
+
+          const due_payment_history_info = {
+            new_invoice_no: new_invoice,
+            old_invoice_no: req.body?.invoice_no,
+            customer_name: req.body?.customer_name,
+            customer_address: req.body?.customer_address,
+            customer_mobile: req.body?.customer_mobile,
+            old_due: req.body?.old_due,
+            paid: req.body?.paid,
+            due: req.body?.due,
+            date: new Date(),
+          };
+          const due_paymnet_info = await due_payment_Collection.insertOne(
+            due_payment_history_info
+          );
+          res.send({ insertedId: due_paymnet_info?.insertedId });
         }
       } catch (error) {
         console.error("Error handling store item addition:", error);
