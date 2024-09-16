@@ -676,7 +676,7 @@ async function run() {
           const dateOnly = currentDate.toISOString().split("T")[0];
 
           const purchaseArray = await purchase_history_Collection
-            .find(query)
+            .find({})
             .toArray();
           const si = purchaseArray.length + 1; // Correct usage of .length
 
