@@ -677,12 +677,19 @@ async function run() {
           orderRecord.storeDate = dateOnly;
 
           // Insert into purchase history
+          const purchase_info = {
+            product_name: req.body.product_name,
+            company_name: req.body.company_name,
+            size: req.body.size,
+            store_quantity: req.body.quantity,
+            purchase_price: req.body.purchase_price,
+          };
           const purchaseHistoryItem =
-            await purchase_history_Collection.insertOne(orderRecord);
+            await purchase_history_Collection.insertOne(purchase_info);
           if (!purchaseHistoryItem.acknowledged) {
-            return res
-              .status(500)
-              .send("Failed to insert into purchase history.");
+            // return res
+            //   .status(500)
+            //   .send("Failed to insert into purchase history.");
           }
 
           // Delete the order from orderCollection
@@ -715,7 +722,6 @@ async function run() {
               size: req.body.size,
               store_quantity: req.body.quantity,
               purchase_price: req.body.purchase_price,
-              sell_price: req.body.sell_price,
             };
 
             const storeInfo = await storeCollection.insertOne(storeItem);
