@@ -722,6 +722,7 @@ async function run() {
               size: req.body.size,
               store_quantity: req.body.quantity,
               purchase_price: req.body.purchase_price,
+              sell_price: req.body?.sell_price,
             };
 
             const storeInfo = await storeCollection.insertOne(storeItem);
