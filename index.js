@@ -702,10 +702,10 @@ async function run() {
           if (findItem) {
             // Update existing store item
             const total_quantity =
-              findItem?.store_quantity + req.body?.quantity;
+              findItem?.store_quantity + Number(req.body?.quantity);
             const updateDoc = {
               $set: {
-                store_quantity: total_quantity,
+                store_quantity: Number(total_quantity),
               },
             };
 
@@ -720,9 +720,9 @@ async function run() {
               product_name: req.body.product_name,
               company_name: req.body.company_name,
               size: req.body.size,
-              store_quantity: req.body.quantity,
-              purchase_price: req.body.purchase_price,
-              sell_price: req.body?.sell_price,
+              store_quantity: Number(req.body.quantity),
+              purchase_price: Number(req.body.purchase_price),
+              sell_price: Number(req.body?.sell_price),
             };
 
             const storeInfo = await storeCollection.insertOne(storeItem);
