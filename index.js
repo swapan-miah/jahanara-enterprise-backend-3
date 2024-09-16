@@ -706,6 +706,8 @@ async function run() {
             const updateDoc = {
               $set: {
                 store_quantity: Number(total_quantity),
+                purchase_price: Number(req.body.purchase_price),
+                sell_price: Number(req.body?.sell_price),
               },
             };
 
