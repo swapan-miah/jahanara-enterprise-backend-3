@@ -54,6 +54,7 @@ async function run() {
     const sells_history_Collection = database.collection("sells-history");
     const due_Collection = database.collection("due");
     const due_payment_Collection = database.collection("due-payment-history");
+    const cost_Collection = database.collection("cost-history");
 
     // find all products
     app.get("/products", async (req, res) => {
@@ -558,8 +559,115 @@ async function run() {
           const id = req.params.id;
           const query = { _id: new ObjectId(id) };
           const result = await due_payment_Collection.findOne(query);
-          console.log(result);
 
+          res.send(result);
+        } else {
+          res.status(403).send({
+            message: "Forbidden: Invalid Key",
+          });
+        }
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred while fetching data.",
+          error,
+        });
+      }
+    });
+
+    // sale_history_this_day for my cash
+    app.get("/summary", async (req, res) => {
+      try {
+        const queryDate = req.query?.date;
+
+        if (!queryDate) {
+          return res
+            .status(400)
+            .send({ message: "Date query parameter is required" });
+        }
+
+        const query = { date: queryDate };
+
+        const sell_his_result = await sells_history_Collection
+          .find(query)
+          .toArray();
+
+        const due_payment_res = await due_payment_Collection
+          .find(query)
+          .toArray();
+
+        const cost_list = await cost_Collection.find(query).toArray();
+        console.log(cost_list);
+
+        // calculate profit from sell
+        const totalSellsProfit = sell_his_result.length
+          ? sell_his_result.reduce((acc, sell) => {
+              const allProductsProfit = sell.products.reduce(
+                (productAcc, product) => productAcc + product.profit,
+                0
+              );
+              return acc + allProductsProfit;
+            }, 0)
+          : 0;
+
+        const overallDue = sell_his_result.length
+          ? sell_his_result.reduce((acc, item) => acc + Number(item.due), 0)
+          : 0;
+
+        const overallPaid = sell_his_result.length
+          ? sell_his_result.reduce((acc, item) => acc + Number(item?.paid), 0)
+          : 0;
+
+        const overallSubTotal = sell_his_result.length
+          ? sell_his_result.reduce((acc, item) => acc + item.subTotal, 0)
+          : 0;
+
+        // overall Paid From Due history collection
+        const overallPaidFromDue = due_payment_res.length
+          ? sell_his_result.reduce((acc, item) => acc + Number(item?.paid), 0)
+          : 0;
+
+        // cost collection
+        const allCost = cost_list.length
+          ? cost_list.reduce((acc, item) => acc + Number(item?.amount), 0)
+          : 0;
+
+        const sell_summary = {
+          profit: totalSellsProfit,
+          due: overallDue,
+          paid: overallPaid,
+          subTotal: overallSubTotal,
+          duePayment: overallPaidFromDue,
+          totalCost: allCost,
+        };
+
+        // Sending results in reverse order for better user experience
+        res.send(sell_summary);
+      } catch (error) {
+        res.status(500).send({
+          message: "An error occurred",
+          error,
+        });
+      }
+    });
+
+    // find all products
+    app.get("/cost-list", async (req, res) => {
+      try {
+        const crose_maching_backend_key = process.env.Front_Backend_Key;
+        const crose_maching_frontend_key =
+          req.headers.authorization?.split(" ")[1];
+
+        if (crose_maching_backend_key === crose_maching_frontend_key) {
+          const queryDate = req.query?.date;
+
+          if (!queryDate) {
+            return res
+              .status(400)
+              .send({ message: "Date query parameter is required" });
+          }
+          const query = { date: queryDate };
+
+          const result = await cost_Collection.find(query).toArray();
           res.send(result);
         } else {
           res.status(403).send({
@@ -790,7 +898,6 @@ async function run() {
           const storeInfo = await sells_history_Collection.insertOne(
             final_Sells_Item
           );
-          // console.log(storeInfo);
 
           // res.send(storeInfo);
 
@@ -878,6 +985,9 @@ async function run() {
 
           const modify_query = { _id: new ObjectId(due_old_record?._id) };
 
+          const currentDate = new Date();
+          const dateOnly = currentDate.toISOString().split("T")[0];
+
           if (req.body.due > 0) {
             const options = { upsert: true };
             const updateDoc = {
@@ -887,7 +997,7 @@ async function run() {
                 customer_address: req.body?.customer_address,
                 customer_mobile: req.body?.customer_mobile,
                 due: req.body?.due,
-                date: new Date(),
+                date: dateOnly,
               },
             };
 
@@ -910,7 +1020,7 @@ async function run() {
             old_due: req.body?.old_due,
             paid: req.body?.paid,
             due: req.body?.due,
-            date: new Date(),
+            date: dateOnly,
           };
           const due_paymnet_info = await due_payment_Collection.insertOne(
             due_payment_history_info
@@ -920,6 +1030,28 @@ async function run() {
       } catch (error) {
         console.error("Error handling store item addition:", error);
         res.status(500).json({ message: "Server Error" });
+      }
+    });
+
+    // ------------------    cost post    ---------------------
+    app.post("/add-cost", async (req, res) => {
+      try {
+        const crose_maching_backend_key = `${process.env.Front_Backend_Key}`;
+        const crose_maching_frontend_key = req.body.crose_maching_key;
+        if (crose_maching_backend_key == crose_maching_frontend_key) {
+          const cost = {
+            type: req.body?.type,
+            amount: req.body?.amount,
+            reason: req.body?.reason,
+            date: req.body?.date,
+          };
+
+          const costResult = await cost_Collection.insertOne(cost);
+          res.send(costResult);
+        }
+      } catch (error) {
+        console.error("Error handling product add:", error);
+        res.status(500).send("Server Error");
       }
     });
 
