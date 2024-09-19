@@ -595,8 +595,10 @@ async function run() {
           .find(query)
           .toArray();
 
+        console.log(due_payment_res);
+
         const cost_list = await cost_Collection.find(query).toArray();
-        console.log(cost_list);
+        // console.log(cost_list);
 
         // calculate profit from sell
         const totalSellsProfit = sell_his_result.length
@@ -623,8 +625,10 @@ async function run() {
 
         // overall Paid From Due history collection
         const overallPaidFromDue = due_payment_res.length
-          ? sell_his_result.reduce((acc, item) => acc + Number(item?.paid), 0)
+          ? due_payment_res.reduce((acc, item) => acc + Number(item?.paid), 0)
           : 0;
+
+        // console.log(overallPaidFromDue);
 
         // cost collection
         const allCost = cost_list.length
