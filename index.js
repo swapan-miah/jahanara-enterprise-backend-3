@@ -29,6 +29,7 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ozyrkam.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
+console.log(uri);
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -46,7 +47,8 @@ cloudinary.config({
 
 async function run() {
   try {
-    const database = client.db("premium-shop-system");
+    const database = client.db("jahanara-enterpeise-3");
+    const adminCollection = database.collection("admin");
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
     const storeCollection = database.collection("store");
@@ -55,6 +57,18 @@ async function run() {
     const due_Collection = database.collection("due");
     const due_payment_Collection = database.collection("due-payment-history");
     const cost_Collection = database.collection("cost-history");
+
+    //------------- find admin by login email
+    app.get("/users/admin/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { userEmail: email };
+      console.log(query);
+
+      const user = await adminCollection.findOne(query);
+      console.log(user);
+
+      res.send({ isAdmin: user?.role == "admin" });
+    });
 
     // find all products
     app.get("/products", async (req, res) => {
