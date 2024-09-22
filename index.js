@@ -47,7 +47,7 @@ cloudinary.config({
 
 async function run() {
   try {
-    const database = client.db("jahanara-enterpeise-3");
+    const database = client.db("jahanara-enterpeise-1");
     const adminCollection = database.collection("admin");
     const productCollection = database.collection("products");
     const orderCollection = database.collection("orders");
